@@ -75,6 +75,8 @@ function App() {
   const mobileControlRef = useRef<HTMLDivElement>(null);
   const nativeMobilePlaybackRef = useRef(false);
   const videoPathRef = useRef(selectVideoPath());
+  const loadTargetRef = useRef(0);
+  const displayedLoadProgressRef = useRef(0);
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadState, setLoadState] = useState("LOADING VISUAL ARCHIVE");
   const [gateOpen, setGateOpen] = useState(false);
@@ -116,6 +118,39 @@ function App() {
   }, []);
 
   useEffect(() => {
+    let frame = 0;
+    let previousTime = performance.now();
+    const progressPerSecond = 29;
+
+    const advanceDisplayedProgress = (currentTime: number) => {
+      const elapsedSeconds = Math.min(64, currentTime - previousTime) / 1000;
+      previousTime = currentTime;
+      const target = loadTargetRef.current;
+      if (displayedLoadProgressRef.current < target) {
+        displayedLoadProgressRef.current = Math.min(
+          target,
+          displayedLoadProgressRef.current + elapsedSeconds * progressPerSecond,
+        );
+        const nextProgress = Math.min(100, Math.floor(displayedLoadProgressRef.current));
+        setLoadProgress((current) => Math.max(current, nextProgress));
+        setLoadState((current) => {
+          if (current === "LOADING COMPATIBILITY VIDEO" || current === "VIDEO UNAVAILABLE · RETRY") return current;
+          if (nextProgress >= 100) return "ACCESS GRANTED";
+          if (nextProgress >= 76) return "PREPARING READING ARCHIVE";
+          if (nextProgress >= 38) return "CALIBRATING CAMERA PATH";
+          return "LOADING VISUAL ARCHIVE";
+        });
+      }
+      if (displayedLoadProgressRef.current < 100) {
+        frame = window.requestAnimationFrame(advanceDisplayedProgress);
+      }
+    };
+
+    frame = window.requestAnimationFrame(advanceDisplayedProgress);
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     let completed = false;
     let usingFallback = false;
@@ -136,8 +171,7 @@ function App() {
         video.pause();
         video.currentTime = 0;
         window.scrollTo(0, 0);
-        setLoadProgress(100);
-        setLoadState("ACCESS GRANTED");
+        loadTargetRef.current = 100;
       }, minimumWait);
     };
 
@@ -147,15 +181,13 @@ function App() {
       const mobileResource = videoPathRef.current === MOBILE_VIDEO_PATH;
       const safeBuffer = Math.min(video.duration, mobileResource ? 3.2 : 4.5);
       const progress = Math.min(96, Math.round((bufferedEnd / safeBuffer) * 96));
-      setLoadProgress((current) => Math.max(current, progress));
-      if (progress > 38) setLoadState("CALIBRATING CAMERA PATH");
-      if (progress > 76) setLoadState("PREPARING READING ARCHIVE");
+      loadTargetRef.current = Math.max(loadTargetRef.current, progress);
       if (bufferedEnd >= safeBuffer && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) finishLoading();
     };
 
     const handleCanPlayThrough = () => finishLoading();
     const handleLoadedMetadata = () => {
-      setLoadProgress((current) => Math.max(current, 8));
+      loadTargetRef.current = Math.max(loadTargetRef.current, 8);
       updateBufferedProgress();
     };
     const handleError = () => {
