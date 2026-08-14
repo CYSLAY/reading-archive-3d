@@ -231,9 +231,9 @@ function App() {
         },
       });
       archiveReveal
-        .to(archiveIntroRef.current, { autoAlpha: 1, y: 0, duration: 0.18, ease: "power2.out" }, 0)
-        .to(archiveIntroRef.current, { autoAlpha: 0, y: -12, duration: 0.18, ease: "power2.in" }, 0.18)
-        .to(archiveRef.current, { autoAlpha: 1, y: 0, duration: 0.22, ease: "power2.out" }, 0.24);
+        .to(archiveIntroRef.current, { autoAlpha: 1, y: 0, duration: 0.12, ease: "power2.out" }, 0)
+        .to(archiveIntroRef.current, { autoAlpha: 0, y: -12, duration: 0.12, ease: "power2.in" }, 0.1)
+        .to(archiveRef.current, { autoAlpha: 1, y: 0, duration: 0.16, ease: "power2.out" }, 0.14);
       irregularOrder
         .filter((index) => index < bookCards.length)
         .forEach((index, step) => {
@@ -241,9 +241,9 @@ function App() {
             autoAlpha: 1,
             scale: 1,
             clipPath: "inset(0% 0% 0% 0%)",
-            duration: 0.2,
+            duration: 0.18,
             ease: "power2.out",
-          }, 0.38 + step * 0.035);
+          }, 0.22 + step * 0.022);
         });
       let archiveStarted = false;
 
