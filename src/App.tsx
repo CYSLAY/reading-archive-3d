@@ -246,8 +246,8 @@ function App() {
       });
       ui
         .to(noteRef.current, { autoAlpha: 1, x: 0, duration: 0.045 }, 0.46)
-        .to(noteRef.current, { autoAlpha: 1, duration: 0.202 }, 0.505)
-        .to(noteRef.current, { autoAlpha: 0, x: -22, duration: 0.045 }, 0.707)
+        .to(noteRef.current, { autoAlpha: 1, duration: 0.015 }, 0.505)
+        .to(noteRef.current, { autoAlpha: 0, x: -22, duration: 0.03 }, 0.52)
         .to(archiveIntroRef.current, { autoAlpha: 1, y: 0, duration: 0.045 }, 0.81)
         .to(archiveIntroRef.current, { autoAlpha: 0, y: -12, duration: 0.035 }, 0.855)
         .to(archiveRef.current, { autoAlpha: 1, y: 0, duration: 0.035 }, 0.855);
