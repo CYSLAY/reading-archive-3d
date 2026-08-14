@@ -9,7 +9,6 @@ gsap.registerPlugin(ScrollTrigger);
 
 const books = booksSource as Book[];
 const VIDEO_DURATION = 13;
-const MOBILE_TRAVEL_DURATION_MS = VIDEO_DURATION * 1000;
 const DESKTOP_VIDEO_PATH = `${import.meta.env.BASE_URL}video/edit/final-bookshelf-13s-desktop.mp4`;
 const MOBILE_VIDEO_PATH = `${import.meta.env.BASE_URL}video/edit/final-bookshelf-13s-mobile.mp4`;
 const FALLBACK_VIDEO_PATH = `${import.meta.env.BASE_URL}video/final-bookshelf-13s.mp4`;
@@ -35,6 +34,15 @@ function mapProgressToTime(progress: number) {
   const end = scrollMap[upperIndex];
   const local = (progress - start.progress) / (end.progress - start.progress);
   return gsap.utils.interpolate(start.time, end.time, local);
+}
+
+function mapTimeToProgress(time: number) {
+  const upperIndex = scrollMap.findIndex((point) => point.time >= time);
+  if (upperIndex <= 0) return scrollMap[0].progress;
+  const start = scrollMap[upperIndex - 1];
+  const end = scrollMap[upperIndex];
+  const local = (time - start.time) / (end.time - start.time);
+  return gsap.utils.interpolate(start.progress, end.progress, local);
 }
 
 function formatDate(date: string) {
@@ -65,6 +73,7 @@ function App() {
   const archiveRef = useRef<HTMLElement>(null);
   const scrollPromptRef = useRef<HTMLDivElement>(null);
   const mobileControlRef = useRef<HTMLDivElement>(null);
+  const nativeMobilePlaybackRef = useRef(false);
   const videoPathRef = useRef(selectVideoPath());
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadState, setLoadState] = useState("LOADING VISUAL ARCHIVE");
@@ -75,6 +84,23 @@ function App() {
   const featured = books[0];
   const featuredEnglish = FEATURED_ENGLISH[featured.id];
   const unlockCountdown = Math.max(0, 100 - loadProgress);
+
+  const stopMobileTravel = () => {
+    nativeMobilePlaybackRef.current = false;
+    videoRef.current?.pause();
+    setMobileAutoPlaying(false);
+  };
+
+  const startMobileTravel = () => {
+    const video = videoRef.current;
+    if (!video || !gateOpen || activeBook) return;
+    nativeMobilePlaybackRef.current = true;
+    setMobileAutoPlaying(true);
+    void video.play().catch(() => {
+      nativeMobilePlaybackRef.current = false;
+      setMobileAutoPlaying(false);
+    });
+  };
 
   const filteredBooks = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -252,11 +278,25 @@ function App() {
       gsap.set(bookCards, { autoAlpha: 0, scale: 0.94, clipPath: "inset(42% 18% 42% 18%)" });
       gsap.set(bookIndex, { overflowY: "hidden", pointerEvents: "none" });
       const playhead = { time: 0 };
+      const mobileViewport = window.matchMedia("(max-width: 900px)").matches;
+      let lastMobileSeekAt = 0;
       const seek = gsap.quickTo(playhead, "time", {
-        duration: 0.22,
+        duration: mobileViewport ? 0.14 : 0.22,
         ease: "power1.out",
         onUpdate: () => {
+          if (nativeMobilePlaybackRef.current) {
+            playhead.time = video.currentTime;
+            return;
+          }
+          const now = performance.now();
+          if (mobileViewport && now - lastMobileSeekAt < 40) return;
           if (video.readyState >= 1 && Math.abs(video.currentTime - playhead.time) > 0.018) {
+            lastMobileSeekAt = now;
+            video.currentTime = playhead.time;
+          }
+        },
+        onComplete: () => {
+          if (!nativeMobilePlaybackRef.current && video.readyState >= 1 && Math.abs(video.currentTime - playhead.time) > 0.018) {
             video.currentTime = playhead.time;
           }
         },
@@ -300,7 +340,11 @@ function App() {
         scrub: 0.55,
         invalidateOnRefresh: true,
         onUpdate: ({ progress }) => {
-          seek(mapProgressToTime(progress));
+          if (nativeMobilePlaybackRef.current) {
+            playhead.time = video.currentTime;
+          } else {
+            seek(mapProgressToTime(progress));
+          }
           gsap.set(".progress-line", { scaleX: progress });
           if (scrollPromptRef.current) gsap.set(scrollPromptRef.current, { autoAlpha: progress < 0.025 ? 1 : 0 });
           if (mobileControlRef.current) {
@@ -349,29 +393,48 @@ function App() {
     if (!mobileAutoPlaying || !gateOpen || activeBook) return;
     if (!window.matchMedia("(max-width: 900px)").matches) return;
 
+    const video = videoRef.current;
+    if (!video) return;
     const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-    const pixelsPerMillisecond = maxScroll / MOBILE_TRAVEL_DURATION_MS;
-    let previousTime = performance.now();
-    let frame = 0;
+    let animationFrame = 0;
+    let videoFrame = 0;
+    let cancelled = false;
+    let lastFallbackSyncAt = 0;
+    const supportsVideoFrameCallback = typeof video.requestVideoFrameCallback === "function";
 
-    const advance = (currentTime: number) => {
-      const elapsed = Math.min(48, currentTime - previousTime);
-      previousTime = currentTime;
-      const nextPosition = Math.min(maxScroll, window.scrollY + elapsed * pixelsPerMillisecond);
-      window.scrollTo(0, nextPosition);
-      if (nextPosition >= maxScroll - 1) {
-        setMobileAutoPlaying(false);
+    const advance = (now = performance.now()) => {
+      if (cancelled) return;
+      if (!supportsVideoFrameCallback && now - lastFallbackSyncAt < 32) {
+        animationFrame = window.requestAnimationFrame(advance);
         return;
       }
-      frame = window.requestAnimationFrame(advance);
+      lastFallbackSyncAt = now;
+      const progress = mapTimeToProgress(Math.min(VIDEO_DURATION, video.currentTime));
+      window.scrollTo(0, Math.min(maxScroll, progress * maxScroll));
+      if (video.ended || video.currentTime >= VIDEO_DURATION - 0.02) {
+        window.scrollTo(0, maxScroll);
+        stopMobileTravel();
+        return;
+      }
+      if (supportsVideoFrameCallback) {
+        videoFrame = video.requestVideoFrameCallback(advance);
+      } else {
+        animationFrame = window.requestAnimationFrame(advance);
+      }
     };
 
-    frame = window.requestAnimationFrame(advance);
-    return () => window.cancelAnimationFrame(frame);
+    if (video.paused) void video.play().catch(stopMobileTravel);
+    advance();
+    return () => {
+      cancelled = true;
+      if (videoFrame && typeof video.cancelVideoFrameCallback === "function") video.cancelVideoFrameCallback(videoFrame);
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      video.pause();
+      nativeMobilePlaybackRef.current = false;
+    };
   }, [activeBook, gateOpen, mobileAutoPlaying]);
 
   useEffect(() => {
-    const stopMobileTravel = () => setMobileAutoPlaying(false);
     const stopWhenHidden = () => { if (document.hidden) stopMobileTravel(); };
     window.addEventListener("blur", stopMobileTravel);
     document.addEventListener("visibilitychange", stopWhenHidden);
@@ -461,19 +524,19 @@ function App() {
               aria-pressed={mobileAutoPlaying}
               onPointerDown={(event) => {
                 event.currentTarget.setPointerCapture(event.pointerId);
-                setMobileAutoPlaying(true);
+                startMobileTravel();
               }}
               onPointerUp={(event) => {
                 if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-                setMobileAutoPlaying(false);
+                stopMobileTravel();
               }}
-              onPointerCancel={() => setMobileAutoPlaying(false)}
-              onLostPointerCapture={() => setMobileAutoPlaying(false)}
+              onPointerCancel={stopMobileTravel}
+              onLostPointerCapture={stopMobileTravel}
               onKeyDown={(event) => {
-                if (event.key === " " || event.key === "Enter") setMobileAutoPlaying(true);
+                if (event.key === " " || event.key === "Enter") startMobileTravel();
               }}
               onKeyUp={(event) => {
-                if (event.key === " " || event.key === "Enter") setMobileAutoPlaying(false);
+                if (event.key === " " || event.key === "Enter") stopMobileTravel();
               }}
               onContextMenu={(event) => event.preventDefault()}
             >
