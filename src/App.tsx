@@ -231,9 +231,7 @@ function App() {
         },
       });
       archiveReveal
-        .to(archiveIntroRef.current, { autoAlpha: 1, y: 0, duration: 0.12, ease: "power2.out" }, 0)
-        .to(archiveIntroRef.current, { autoAlpha: 0, y: -12, duration: 0.12, ease: "power2.in" }, 0.1)
-        .to(archiveRef.current, { autoAlpha: 1, y: 0, duration: 0.16, ease: "power2.out" }, 0.14);
+        .to(archiveRef.current, { autoAlpha: 1, y: 0, duration: 0.16, ease: "power2.out" }, 0);
       irregularOrder
         .filter((index) => index < bookCards.length)
         .forEach((index, step) => {
@@ -243,14 +241,13 @@ function App() {
             clipPath: "inset(0% 0% 0% 0%)",
             duration: 0.18,
             ease: "power2.out",
-          }, 0.22 + step * 0.022);
+          }, 0.08 + step * 0.022);
         });
       let archiveStarted = false;
       let archiveHideTween: gsap.core.Tween | null = null;
 
       const resetArchive = () => {
         archiveReveal.pause(0);
-        gsap.set(archiveIntroRef.current, { autoAlpha: 0, y: 18 });
         gsap.set(archiveRef.current, { autoAlpha: 0, y: 26, pointerEvents: "none" });
         gsap.set(bookCards, { autoAlpha: 0, scale: 0.94, clipPath: "inset(42% 18% 42% 18%)" });
         gsap.set(bookIndex, { overflowY: "hidden", pointerEvents: "none" });
@@ -300,6 +297,9 @@ function App() {
         .to(noteRef.current, { autoAlpha: 1, x: 0, duration: 0.045 }, 0.46)
         .to(noteRef.current, { autoAlpha: 1, duration: 0.015 }, 0.505)
         .to(noteRef.current, { autoAlpha: 0, x: -22, duration: 0.03 }, 0.52)
+        .to(archiveIntroRef.current, { autoAlpha: 1, y: 0, duration: 0.025 }, 0.865)
+        .to(archiveIntroRef.current, { autoAlpha: 1, duration: 0.095 }, 0.89)
+        .to(archiveIntroRef.current, { autoAlpha: 0, y: -12, duration: 0.014 }, 0.985)
         .to({}, { duration: 0.001 }, 0.999);
     }, experience);
     return () => context.revert();
