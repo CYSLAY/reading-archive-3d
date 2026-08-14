@@ -23,6 +23,7 @@ const scrollMap = [
   { progress: 0.48, time: 5.7 },
   { progress: 0.60, time: 8.8 },
   { progress: 0.82, time: 11 },
+  { progress: 0.88, time: VIDEO_DURATION },
   { progress: 1, time: VIDEO_DURATION },
 ];
 
@@ -248,9 +249,9 @@ function App() {
         .to(noteRef.current, { autoAlpha: 1, x: 0, duration: 0.045 }, 0.46)
         .to(noteRef.current, { autoAlpha: 1, duration: 0.015 }, 0.505)
         .to(noteRef.current, { autoAlpha: 0, x: -22, duration: 0.03 }, 0.52)
-        .to(archiveIntroRef.current, { autoAlpha: 1, y: 0, duration: 0.045 }, 0.81)
-        .to(archiveIntroRef.current, { autoAlpha: 0, y: -12, duration: 0.035 }, 0.855)
-        .to(archiveRef.current, { autoAlpha: 1, y: 0, duration: 0.035 }, 0.855);
+        .to(archiveIntroRef.current, { autoAlpha: 1, y: 0, duration: 0.04 }, 0.845)
+        .to(archiveIntroRef.current, { autoAlpha: 0, y: -12, duration: 0.015 }, 0.885)
+        .to(archiveRef.current, { autoAlpha: 1, y: 0, duration: 0.015 }, 0.9);
 
       const irregularOrder = [0, 6, 13, 3, 18, 9, 1, 15, 5, 20, 11, 2, 17, 7, 22, 4, 14, 8, 19, 10, 23, 12, 21, 16, 24];
       irregularOrder
@@ -260,12 +261,12 @@ function App() {
             autoAlpha: 1,
             scale: 1,
             clipPath: "inset(0% 0% 0% 0%)",
-            duration: 0.025,
+            duration: 0.018,
             ease: "power2.out",
-          }, 0.865 + step * 0.0045);
+          }, 0.915 + step * 0.0026);
         });
-      ui.to(archiveRef.current, { pointerEvents: "auto", duration: 0.001 }, 0.99)
-        .to(bookIndex, { overflowY: "auto", pointerEvents: "auto", duration: 0.001 }, 0.99);
+      ui.to(archiveRef.current, { pointerEvents: "auto", duration: 0.001 }, 0.998)
+        .to(bookIndex, { overflowY: "auto", pointerEvents: "auto", duration: 0.001 }, 0.998);
     }, experience);
     return () => context.revert();
   }, [gateOpen]);
