@@ -83,7 +83,7 @@ function App() {
   const [query, setQuery] = useState("");
   const featured = books[0];
   const featuredEnglish = FEATURED_ENGLISH[featured.id];
-  const unlockCountdown = Math.max(0, 100 - loadProgress);
+  const unlockProgress = Math.min(100, Math.max(0, loadProgress));
 
   const stopMobileTravel = () => {
     nativeMobilePlaybackRef.current = false;
@@ -553,12 +553,12 @@ function App() {
                 {Array.from({ length: 9 }, (_, index) => <i key={index} />)}
               </div>
               <div className="lock-screen">
-                <div className="digit-window" aria-label={`解锁倒数 ${unlockCountdown}`}>
-                  {String(unlockCountdown).padStart(3, "0").split("").map((digit, index) => <i key={`${index}-${digit}`}>{digit}</i>)}
+                <div className="digit-window" aria-label={`解锁进度 ${unlockProgress}`}>
+                  {String(unlockProgress).padStart(3, "0").split("").map((digit, index) => <i key={`${index}-${digit}`}>{digit}</i>)}
                 </div>
                 <p>{loadState}</p>
                 <div className="load-track"><i style={{ transform: `scaleX(${loadProgress / 100})` }} /></div>
-                <span>T - {unlockCountdown.toString().padStart(3, "0")}</span>
+                <span>ACCESS - {unlockProgress.toString().padStart(3, "0")}</span>
               </div>
             </div>
           </div>
