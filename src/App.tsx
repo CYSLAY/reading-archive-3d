@@ -46,6 +46,7 @@ function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const gateRef = useRef<HTMLDivElement>(null);
   const lockRef = useRef<HTMLDivElement>(null);
+  const sparksRef = useRef<HTMLDivElement>(null);
   const noteRef = useRef<HTMLElement>(null);
   const archiveIntroRef = useRef<HTMLDivElement>(null);
   const archiveRef = useRef<HTMLElement>(null);
@@ -134,6 +135,19 @@ function App() {
 
   useEffect(() => {
     if (loadProgress < 100 || !gateRef.current) return;
+    const sparks = sparksRef.current?.querySelectorAll("i") ?? [];
+    const flash = sparksRef.current?.querySelectorAll("b") ?? [];
+    const sparkPaths = [
+      { x: 54, y: -42, rotate: -38 },
+      { x: 72, y: -24, rotate: -20 },
+      { x: 46, y: -10, rotate: -8 },
+      { x: 82, y: 2, rotate: 2 },
+      { x: 58, y: 18, rotate: 17 },
+      { x: 74, y: 38, rotate: 29 },
+      { x: 38, y: 48, rotate: 42 },
+      { x: 48, y: -54, rotate: -47 },
+      { x: 60, y: 30, rotate: 25 },
+    ];
     const timeline = gsap.timeline({
       onComplete: () => {
         setGateOpen(true);
@@ -141,9 +155,38 @@ function App() {
         ScrollTrigger.refresh();
       },
     });
+    gsap.set(sparks, { autoAlpha: 0, x: 0, y: 0, scaleX: 0.2, scaleY: 0.75 });
+    gsap.set(flash, { autoAlpha: 0, scale: 0.2 });
     timeline
       .to(lockRef.current, { scale: 1.025, duration: 0.16, ease: "power2.out" })
-      .to(lockRef.current, { y: () => window.innerHeight * 0.86, rotate: 3.5, duration: 0.78, ease: "power4.in" }, "+=0.22")
+      .to(lockRef.current, {
+        x: 14,
+        y: 18,
+        rotate: 30,
+        transformOrigin: "48% 50%",
+        duration: 0.2,
+        ease: "power3.in",
+      }, "+=0.16")
+      .to(flash, { autoAlpha: 1, scale: 1.8, duration: 0.055, ease: "power3.out" }, "<-=0.04")
+      .to(flash, { autoAlpha: 0, scale: 0.7, duration: 0.13, ease: "power2.out" })
+      .to(sparks, { autoAlpha: 1, duration: 0.025, stagger: 0.012 }, "<-=0.17")
+      .to(sparks, {
+        autoAlpha: 0,
+        x: (index) => sparkPaths[index]?.x ?? 48,
+        y: (index) => sparkPaths[index]?.y ?? 0,
+        rotate: (index) => sparkPaths[index]?.rotate ?? 0,
+        scaleX: (index) => 0.75 + (index % 3) * 0.34,
+        duration: 0.24,
+        ease: "power2.out",
+        stagger: 0.012,
+      }, "<-=0.025")
+      .to(lockRef.current, {
+        x: () => window.innerWidth * 0.08,
+        y: () => window.innerHeight * 1.08,
+        rotate: 30,
+        duration: 0.78,
+        ease: "power4.in",
+      }, "+=0.07")
       .to(gateRef.current, { autoAlpha: 0, duration: 0.92, ease: "power2.inOut", pointerEvents: "none" }, "-=0.3")
       .fromTo([scrollPromptRef.current, mobileControlRef.current], { autoAlpha: 0, y: 12 }, { autoAlpha: 1, y: 0, duration: 0.5 });
     return () => { timeline.kill(); };
@@ -367,6 +410,10 @@ function App() {
           <div className="loading-gate" ref={gateRef} aria-live="polite">
             <div className="password-lock" ref={lockRef}>
               <img className="lock-shell" src={`${import.meta.env.BASE_URL}gate/security-lock-v4.png`} alt="" aria-hidden="true" />
+              <div className="lock-sparks" ref={sparksRef} aria-hidden="true">
+                <b />
+                {Array.from({ length: 9 }, (_, index) => <i key={index} />)}
+              </div>
               <div className="lock-screen">
                 <div className="digit-window" aria-label={`解锁倒数 ${unlockCountdown}`}>
                   {String(unlockCountdown).padStart(3, "0").split("").map((digit, index) => <i key={`${index}-${digit}`}>{digit}</i>)}
