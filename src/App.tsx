@@ -10,7 +10,9 @@ gsap.registerPlugin(ScrollTrigger);
 const books = booksSource as Book[];
 const VIDEO_DURATION = 13;
 const MOBILE_TRAVEL_DURATION_MS = VIDEO_DURATION * 1000;
-const VIDEO_PATH = `${import.meta.env.BASE_URL}video/final-bookshelf-13s.mp4`;
+const DESKTOP_VIDEO_PATH = `${import.meta.env.BASE_URL}video/edit/final-bookshelf-13s-desktop.mp4`;
+const MOBILE_VIDEO_PATH = `${import.meta.env.BASE_URL}video/edit/final-bookshelf-13s-mobile.mp4`;
+const FALLBACK_VIDEO_PATH = `${import.meta.env.BASE_URL}video/final-bookshelf-13s.mp4`;
 const FEATURED_ENGLISH: Record<string, { title: string; author: string }> = {
   tenpercent: { title: "10% HUMAN", author: "ALANNA COLLEN" },
 };
@@ -41,6 +43,17 @@ function formatDate(date: string) {
     .format(new Date(`${date}T00:00:00`));
 }
 
+function selectVideoPath() {
+  const connection = (navigator as Navigator & {
+    connection?: { effectiveType?: string; saveData?: boolean };
+  }).connection;
+  const compactViewport = window.matchMedia("(max-width: 820px), (pointer: coarse)").matches;
+  const constrainedNetwork = Boolean(
+    connection?.saveData || connection?.effectiveType === "slow-2g" || connection?.effectiveType === "2g" || connection?.effectiveType === "3g",
+  );
+  return compactViewport || constrainedNetwork ? MOBILE_VIDEO_PATH : DESKTOP_VIDEO_PATH;
+}
+
 function App() {
   const experienceRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -52,7 +65,7 @@ function App() {
   const archiveRef = useRef<HTMLElement>(null);
   const scrollPromptRef = useRef<HTMLDivElement>(null);
   const mobileControlRef = useRef<HTMLDivElement>(null);
-  const objectUrlRef = useRef<string | null>(null);
+  const videoPathRef = useRef(selectVideoPath());
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadState, setLoadState] = useState("LOADING VISUAL ARCHIVE");
   const [gateOpen, setGateOpen] = useState(false);
@@ -78,58 +91,85 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
+    let completed = false;
+    let usingFallback = false;
+    let minimumTimer = 0;
+    let safetyTimer = 0;
     const startedAt = performance.now();
+    const video = videoRef.current;
+    if (!video) return;
     document.documentElement.classList.add("is-loading");
 
-    async function loadVideo() {
-      try {
-        const response = await fetch(VIDEO_PATH);
-        if (!response.ok || !response.body) throw new Error("video response unavailable");
-        const total = Number(response.headers.get("content-length")) || 0;
-        const reader = response.body.getReader();
-        const chunks: Uint8Array[] = [];
-        let received = 0;
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (cancelled) return;
-          chunks.push(value);
-          received += value.byteLength;
-          if (total) setLoadProgress(Math.min(98, Math.round((received / total) * 100)));
-          if (received > total * 0.4) setLoadState("CALIBRATING CAMERA PATH");
-          if (received > total * 0.76) setLoadState("PREPARING READING ARCHIVE");
-        }
-
-        const blob = new Blob(chunks.map((chunk) => chunk.slice().buffer as ArrayBuffer), { type: "video/mp4" });
-        const url = URL.createObjectURL(blob);
-        objectUrlRef.current = url;
-        if (videoRef.current) {
-          videoRef.current.src = url;
-          videoRef.current.load();
-        }
-        const minimumWait = Math.max(0, 1400 - (performance.now() - startedAt));
-        await new Promise((resolve) => window.setTimeout(resolve, minimumWait));
-      } catch {
-        if (videoRef.current) videoRef.current.src = VIDEO_PATH;
-      }
-
-      if (!cancelled) {
-        if (videoRef.current) {
-          videoRef.current.pause();
-          videoRef.current.currentTime = 0;
-        }
+    const finishLoading = () => {
+      if (cancelled || completed) return;
+      const minimumWait = Math.max(0, 1400 - (performance.now() - startedAt));
+      window.clearTimeout(minimumTimer);
+      minimumTimer = window.setTimeout(() => {
+        if (cancelled || completed) return;
+        completed = true;
+        video.pause();
+        video.currentTime = 0;
         window.scrollTo(0, 0);
         setLoadProgress(100);
         setLoadState("ACCESS GRANTED");
-      }
-    }
+      }, minimumWait);
+    };
 
-    void loadVideo();
+    const updateBufferedProgress = () => {
+      if (completed || !Number.isFinite(video.duration) || !video.buffered.length) return;
+      const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+      const mobileResource = videoPathRef.current === MOBILE_VIDEO_PATH;
+      const safeBuffer = Math.min(video.duration, mobileResource ? 3.2 : 4.5);
+      const progress = Math.min(96, Math.round((bufferedEnd / safeBuffer) * 96));
+      setLoadProgress((current) => Math.max(current, progress));
+      if (progress > 38) setLoadState("CALIBRATING CAMERA PATH");
+      if (progress > 76) setLoadState("PREPARING READING ARCHIVE");
+      if (bufferedEnd >= safeBuffer && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) finishLoading();
+    };
+
+    const handleCanPlayThrough = () => finishLoading();
+    const handleLoadedMetadata = () => {
+      setLoadProgress((current) => Math.max(current, 8));
+      updateBufferedProgress();
+    };
+    const handleError = () => {
+      if (usingFallback) {
+        setLoadState("VIDEO UNAVAILABLE · RETRY");
+        return;
+      }
+      usingFallback = true;
+      videoPathRef.current = FALLBACK_VIDEO_PATH;
+      setLoadState("LOADING COMPATIBILITY VIDEO");
+      video.src = FALLBACK_VIDEO_PATH;
+      video.load();
+    };
+
+    video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    video.addEventListener("progress", updateBufferedProgress);
+    video.addEventListener("canplay", updateBufferedProgress);
+    video.addEventListener("canplaythrough", handleCanPlayThrough);
+    video.addEventListener("error", handleError);
+    video.src = videoPathRef.current;
+    video.load();
+
+    safetyTimer = window.setTimeout(() => {
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        finishLoading();
+      } else if (!usingFallback) {
+        handleError();
+      }
+    }, 10_000);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(minimumTimer);
+      window.clearTimeout(safetyTimer);
       document.documentElement.classList.remove("is-loading");
-      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      video.removeEventListener("progress", updateBufferedProgress);
+      video.removeEventListener("canplay", updateBufferedProgress);
+      video.removeEventListener("canplaythrough", handleCanPlayThrough);
+      video.removeEventListener("error", handleError);
     };
   }, []);
 
