@@ -23,7 +23,6 @@ const scrollMap = [
   { progress: 0.48, time: 5.7 },
   { progress: 0.60, time: 8.8 },
   { progress: 0.82, time: 11 },
-  { progress: 0.88, time: VIDEO_DURATION },
   { progress: 1, time: VIDEO_DURATION },
 ];
 
@@ -223,6 +222,31 @@ function App() {
         },
       });
 
+      const irregularOrder = [0, 6, 13, 3, 18, 9, 1, 15, 5, 20, 11, 2, 17, 7, 22, 4, 14, 8, 19, 10, 23, 12, 21, 16, 24];
+      const archiveReveal = gsap.timeline({
+        paused: true,
+        onComplete: () => {
+          gsap.set(archiveRef.current, { pointerEvents: "auto" });
+          gsap.set(bookIndex, { overflowY: "auto", pointerEvents: "auto" });
+        },
+      });
+      archiveReveal
+        .to(archiveIntroRef.current, { autoAlpha: 1, y: 0, duration: 0.18, ease: "power2.out" }, 0)
+        .to(archiveIntroRef.current, { autoAlpha: 0, y: -12, duration: 0.18, ease: "power2.in" }, 0.18)
+        .to(archiveRef.current, { autoAlpha: 1, y: 0, duration: 0.22, ease: "power2.out" }, 0.24);
+      irregularOrder
+        .filter((index) => index < bookCards.length)
+        .forEach((index, step) => {
+          archiveReveal.to(bookCards[index], {
+            autoAlpha: 1,
+            scale: 1,
+            clipPath: "inset(0% 0% 0% 0%)",
+            duration: 0.2,
+            ease: "power2.out",
+          }, 0.38 + step * 0.035);
+        });
+      let archiveStarted = false;
+
       ScrollTrigger.create({
         trigger: experience,
         start: "top top",
@@ -235,9 +259,14 @@ function App() {
           if (scrollPromptRef.current) gsap.set(scrollPromptRef.current, { autoAlpha: progress < 0.025 ? 1 : 0 });
           if (mobileControlRef.current) {
             gsap.set(mobileControlRef.current, {
-              autoAlpha: progress < 0.99 ? 1 : 0,
-              pointerEvents: progress < 0.99 ? "auto" : "none",
+              autoAlpha: progress < 0.998 ? 1 : 0,
+              pointerEvents: progress < 0.998 ? "auto" : "none",
             });
+          }
+          if (progress >= 0.999 && !archiveStarted) {
+            archiveStarted = true;
+            video.currentTime = VIDEO_DURATION;
+            archiveReveal.play(0);
           }
         },
       });
@@ -249,24 +278,7 @@ function App() {
         .to(noteRef.current, { autoAlpha: 1, x: 0, duration: 0.045 }, 0.46)
         .to(noteRef.current, { autoAlpha: 1, duration: 0.015 }, 0.505)
         .to(noteRef.current, { autoAlpha: 0, x: -22, duration: 0.03 }, 0.52)
-        .to(archiveIntroRef.current, { autoAlpha: 1, y: 0, duration: 0.04 }, 0.845)
-        .to(archiveIntroRef.current, { autoAlpha: 0, y: -12, duration: 0.015 }, 0.885)
-        .to(archiveRef.current, { autoAlpha: 1, y: 0, duration: 0.015 }, 0.9);
-
-      const irregularOrder = [0, 6, 13, 3, 18, 9, 1, 15, 5, 20, 11, 2, 17, 7, 22, 4, 14, 8, 19, 10, 23, 12, 21, 16, 24];
-      irregularOrder
-        .filter((index) => index < bookCards.length)
-        .forEach((index, step) => {
-          ui.to(bookCards[index], {
-            autoAlpha: 1,
-            scale: 1,
-            clipPath: "inset(0% 0% 0% 0%)",
-            duration: 0.018,
-            ease: "power2.out",
-          }, 0.915 + step * 0.0026);
-        });
-      ui.to(archiveRef.current, { pointerEvents: "auto", duration: 0.001 }, 0.998)
-        .to(bookIndex, { overflowY: "auto", pointerEvents: "auto", duration: 0.001 }, 0.998);
+        .to({}, { duration: 0.001 }, 0.999);
     }, experience);
     return () => context.revert();
   }, [gateOpen]);
