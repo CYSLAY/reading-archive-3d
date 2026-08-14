@@ -246,6 +246,15 @@ function App() {
           }, 0.22 + step * 0.022);
         });
       let archiveStarted = false;
+      let archiveHideTween: gsap.core.Tween | null = null;
+
+      const resetArchive = () => {
+        archiveReveal.pause(0);
+        gsap.set(archiveIntroRef.current, { autoAlpha: 0, y: 18 });
+        gsap.set(archiveRef.current, { autoAlpha: 0, y: 26, pointerEvents: "none" });
+        gsap.set(bookCards, { autoAlpha: 0, scale: 0.94, clipPath: "inset(42% 18% 42% 18%)" });
+        gsap.set(bookIndex, { overflowY: "hidden", pointerEvents: "none" });
+      };
 
       ScrollTrigger.create({
         trigger: experience,
@@ -265,8 +274,21 @@ function App() {
           }
           if (progress >= 0.999 && !archiveStarted) {
             archiveStarted = true;
+            archiveHideTween?.kill();
+            resetArchive();
             video.currentTime = VIDEO_DURATION;
             archiveReveal.play(0);
+          } else if (progress < 0.995 && archiveStarted) {
+            archiveStarted = false;
+            archiveReveal.pause();
+            gsap.set(archiveRef.current, { pointerEvents: "none" });
+            gsap.set(bookIndex, { overflowY: "hidden", pointerEvents: "none" });
+            archiveHideTween = gsap.to(archiveRef.current, {
+              autoAlpha: 0,
+              duration: 0.22,
+              ease: "power2.out",
+              onComplete: resetArchive,
+            });
           }
         },
       });
